@@ -55,6 +55,12 @@ loop.panel = (function(_, mozL10n) {
       this.closeWindow();
     },
 
+    handleSignUpClick: function(event) {
+      event.preventDefault();
+      loop.request("SignupToFxA", true);
+      this.closeWindow();
+    },
+
     handleGuestClick: function(event) {
       loop.request("LogoutFromFxA");
     },
@@ -79,6 +85,10 @@ loop.panel = (function(_, mozL10n) {
             React.createElement("button", {className: "btn btn-info sign-in-request-button", 
                     onClick: this.handleSignInClick}, 
               mozL10n.get("sign_in_again_button")
+            ), 
+            React.createElement("button", {className: "btn btn-info", 
+                    onClick: this.handleSignUpClick}, 
+              mozL10n.get("panel_footer_signup_link")
             )
           ), 
           React.createElement("a", {onClick: this.handleGuestClick}, 
@@ -337,6 +347,46 @@ loop.panel = (function(_, mozL10n) {
       this.closeWindow();
     },
 
+    handleSignUpLinkClick: function() {
+      loop.request("SignupToFxA");
+      this.closeWindow();
+    },
+
+    componentDidMount: function() {
+      // We add the event listeners in here because .renderToStaticMarkup
+      // does not allow onClick events directly on the tag
+      let node = this.getDOMNode();
+      console.log("--  NODE: " + node);
+      console.log("--  NODE inner: " + node.innerHTML);
+      console.log("--  NODE child: " + node.childNodes);
+      let signin = node.querySelector("a[id=sign-in-link]");
+      let signup = node.querySelector("a[id=sign-up-link]");
+
+      signin.addEventListener("click", this.handleSignInLinkClick);
+      signup.addEventListener("click", this.handleSignUpLinkClick);
+    },
+
+    _getContent: function() {
+      // We use this technique of static markup as it means we get
+      // just one overall string for L10n to define the structure of
+      // the whole item.
+      // XXX: if click events, not really neccesary to use <a> tags ??
+      return { __html: mozL10n.get(
+        "panel_footer_signin_signup_message", {
+          "panel_footer_signin_link": React.renderToStaticMarkup(
+            React.createElement("a", {href: "#", id: "sign-in-link"}, 
+              mozL10n.get("panel_footer_signin_link")
+            )
+          ),
+          "panel_footer_signup_link": React.renderToStaticMarkup(
+            React.createElement("a", {href: "#", id: "sign-up-link"}, 
+              mozL10n.get("panel_footer_signup_link")
+            )
+          )
+        })
+      };
+    },
+
     render: function() {
       if (!this.props.fxAEnabled) {
         return null;
@@ -351,10 +401,8 @@ loop.panel = (function(_, mozL10n) {
       }
 
       return (
-        React.createElement("p", {className: "signin-link"}, 
-          React.createElement("a", {href: "#", onClick: this.handleSignInLinkClick}, 
-            mozL10n.get("panel_footer_signin_or_signup_link")
-          )
+        React.createElement("p", {className: "signin-link", 
+           dangerouslySetInnerHTML: this._getContent()}
         )
       );
     }

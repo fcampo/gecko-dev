@@ -70,6 +70,7 @@ describe("loop.panel", function() {
       HangupAllChatWindows: function() {},
       IsMultiProcessEnabled: sinon.stub(),
       LoginToFxA: sinon.stub(),
+      SignupToFxA: sinon.stub(),
       LogoutFromFxA: sinon.stub(),
       NotifyUITour: sinon.stub(),
       OpenURL: sinon.stub(),
@@ -192,7 +193,13 @@ describe("loop.panel", function() {
           notifications: notifications,
           dispatcher: dispatcher,
           roomStore: roomStore
-        }));
+        })
+      );
+    }
+
+    function mountTestAccountLink() {
+      return TestUtils.renderIntoDocument(
+        React.createElement(loop.panel.AccountLink));
     }
 
     it("should hide the account entry when FxA is not enabled", function() {
@@ -208,36 +215,67 @@ describe("loop.panel", function() {
         .to.have.length.of(0);
     });
 
+    it("should NOT show the context menu on right click", function() {
+      var prevent = sandbox.stub();
+      var view = createTestPanelView();
+      TestUtils.Simulate.contextMenu(
+        view.getDOMNode(),
+        { preventDefault: prevent }
+      );
+      sinon.assert.calledOnce(prevent);
+    });
+
     describe("AccountLink", function() {
-      it("should trigger the FxA sign in/up process when clicking the link",
+      it("should trigger the FxA sign in process when clicking the SignIn link",
         function() {
           var stub = sandbox.stub();
           LoopMochaUtils.stubLoopRequest({
             LoginToFxA: stub
           });
 
-          var view = createTestPanelView();
-          TestUtils.Simulate.click(view.getDOMNode().querySelector(".signin-link > a"));
+          var view = mountTestAccountLink();
+          // Use the first link for the simulation
+          TestUtils.Simulate.click(
+            view.getDOMNode().querySelectorAll(".signin-link > a")[0]
+          );
 
           sinon.assert.calledOnce(stub);
         });
 
-      it("should close the panel after clicking the link", function() {
-        var view = createTestPanelView();
+      it("should close the panel after clicking the Sign In link", function() {
+        var view = mountTestAccountLink();
 
-        TestUtils.Simulate.click(view.getDOMNode().querySelector(".signin-link > a"));
+        TestUtils.Simulate.click(
+          view.getDOMNode().querySelectorAll(".signin-link > a")[0]
+        );
 
         sinon.assert.calledOnce(fakeWindow.close);
       });
 
-      it("should NOT show the context menu on right click", function() {
-        var prevent = sandbox.stub();
+      it("should trigger the FxA sign in process when clicking the SignUp link",
+        function() {
+          var stub = sandbox.stub();
+          LoopMochaUtils.stubLoopRequest({
+            SignupToFxA: stub
+          });
+
+          var view = createTestPanelView();
+          // Use the first link for the simulation
+          TestUtils.Simulate.click(
+            view.getDOMNode().querySelectorAll(".signin-link > a")[1]
+          );
+
+          sinon.assert.calledOnce(stub);
+        });
+
+      it("should close the panel after clicking the Sign Up link", function() {
         var view = createTestPanelView();
-        TestUtils.Simulate.contextMenu(
-          view.getDOMNode(),
-          { preventDefault: prevent }
+
+        TestUtils.Simulate.click(
+          view.getDOMNode().querySelectorAll(".signin-link > a")[1]
         );
-        sinon.assert.calledOnce(prevent);
+
+        sinon.assert.calledOnce(fakeWindow.close);
       });
 
       it("should be hidden if FxA is not enabled", function() {

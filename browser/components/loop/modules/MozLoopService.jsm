@@ -1075,7 +1075,7 @@ var MozLoopServiceInternal = {
    * @param {Boolean} forceReAuth Set to true to force the user to reauthenticate.
    * @return {Promise}
    */
-  promiseFxAOAuthClient: Task.async(function* (forceReAuth) {
+  promiseFxAOAuthClient: Task.async(function* (forceReAuth, action) {
     // We must make sure to have only a single client otherwise they will have different states and
     // multiple channels. This would happen if the user clicks the Login button more than once.
     if (gFxAOAuthClientPromise) {
@@ -1086,6 +1086,11 @@ var MozLoopServiceInternal = {
       parameters => {
         // Add the fact that we want keys to the parameters.
         parameters.keys = true;
+
+        if (action) {
+          parameters.action = action;
+        }
+
         if (forceReAuth) {
           parameters.action = "force_auth";
           parameters.email = MozLoopService.userProfile.email;
@@ -1116,9 +1121,9 @@ var MozLoopServiceInternal = {
    * @param {Boolean} forceReAuth Set to true to force the user to reauthenticate.
    * @return {Promise}
    */
-  promiseFxAOAuthAuthorization: function(forceReAuth) {
+  promiseFxAOAuthAuthorization: function(forceReAuth, action) {
     let deferred = Promise.defer();
-    this.promiseFxAOAuthClient(forceReAuth).then(
+    this.promiseFxAOAuthClient(forceReAuth, action).then(
       client => {
         client.onComplete = this._fxAOAuthComplete.bind(this, deferred);
         client.onError = this._fxAOAuthError.bind(this, deferred);
@@ -1663,10 +1668,12 @@ this.MozLoopService = {
    * @return {Promise} that resolves when the FxA login flow is complete.
    */
   logInToFxA: function(forceReAuth) {
+    gFxAOAuthClientPromise = null;
     log.debug("logInToFxA with fxAOAuthTokenData:", !!MozLoopServiceInternal.fxAOAuthTokenData);
     if (!forceReAuth && MozLoopServiceInternal.fxAOAuthTokenData) {
       return Promise.resolve(MozLoopServiceInternal.fxAOAuthTokenData);
     }
+
     return MozLoopServiceInternal.promiseFxAOAuthAuthorization(forceReAuth).then(response => {
       return MozLoopServiceInternal.promiseFxAOAuthToken(response.code, response.state);
     }).then(tokenData => {
@@ -1693,6 +1700,54 @@ this.MozLoopService = {
       throw error;
     });
   },
+  /**
+   * Start the FxA signup flow using the OAuth client and params from the Loop server.
+   *
+   * The caller should be prepared to handle rejections related to network, server or login errors.
+   *
+   * @return {Promise} that resolves when the FxA signup flow is complete.
+   */
+  // signupToFxA: function() {
+  //   gFxAOAuthClientPromise = null;
+  //   log.debug("signupToFxA with fxAOAuthTokenData:", !!MozLoopServiceInternal.fxAOAuthTokenData);
+
+  //   return MozLoopServiceInternal.promiseFxAOAuthAuthorization(false, "signup").then(response => {
+  //     return MozLoopServiceInternal.promiseFxAOAuthToken(response.code, response.state);
+  //   }).then(tokenData => {
+  //     MozLoopServiceInternal.fxAOAuthTokenData = tokenData;
+  //     return tokenData;
+  //   }).then(tokenData => {
+  //     return MozLoopServiceInternal.promiseRegisteredWithServers(LOOP_SESSION_TYPE.FXA).then(() => {
+  //       MozLoopServiceInternal.clearError("login");
+  //       MozLoopServiceInternal.clearError("profile");
+  //       return MozLoopServiceInternal.fxAOAuthTokenData;
+  //     });
+  //   });
+  // },
+
+  signupToFxA: Task.async(function* () {
+    gFxAOAuthClientPromise = null;
+    try {
+      let { code, state } = yield MozLoopServiceInternal
+        .promiseFxAOAuthAuthorization(false, "signup");
+
+      let tokenData = yield MozLoopServiceInternal
+        .promiseFxAOAuthToken(code, state);
+
+      MozLoopServiceInternal.fxAOAuthTokenData = tokenData;
+
+      yield MozLoopServiceInternal.promiseRegisteredWithServers(
+        LOOP_SESSION_TYPE.FXA
+      );
+    } catch (err) {
+      throw err;
+    }
+    finally {
+      MozLoopServiceInternal.clearError("login");
+      MozLoopServiceInternal.clearError("profile");
+      return MozLoopServiceInternal.fxAOAuthTokenData;
+    }
+  }),
 
   /**
    * Logs the user out from FxA.
